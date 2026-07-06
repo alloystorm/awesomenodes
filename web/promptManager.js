@@ -245,10 +245,25 @@ async function showTemplateEditor() {
                 padding: "8px", backgroundColor: "#1a1a1a", borderRadius: "4px"
             });
             
+            const leftGroup = document.createElement("div");
+            Object.assign(leftGroup.style, {
+                display: "flex", alignItems: "center", gap: "10px", flex: "1", overflow: "hidden"
+            });
+            
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = item.enabled !== false; // default true
+            checkbox.onchange = (e) => {
+                item.enabled = e.target.checked;
+            };
+            
             const itemText = document.createElement("span");
-            itemText.innerText = item;
+            itemText.innerText = item.text || item; // fallback if somehow still string
             itemText.style.flex = "1";
             itemText.style.wordBreak = "break-all";
+            
+            leftGroup.appendChild(checkbox);
+            leftGroup.appendChild(itemText);
 
             const delBtn = document.createElement("button");
             delBtn.innerText = "Delete";
@@ -261,7 +276,7 @@ async function showTemplateEditor() {
                 render();
             };
             
-            itemRow.appendChild(itemText);
+            itemRow.appendChild(leftGroup);
             itemRow.appendChild(delBtn);
             listContainer.appendChild(itemRow);
         });
@@ -271,7 +286,7 @@ async function showTemplateEditor() {
         if (!activeCategory) return;
         const val = addInput.value.trim();
         if (val) {
-            templates[activeCategory].push(val);
+            templates[activeCategory].push({ text: val, enabled: true });
             addInput.value = "";
             render();
             listContainer.scrollTop = listContainer.scrollHeight;

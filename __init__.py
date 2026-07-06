@@ -87,6 +87,19 @@ def load_templates():
     templates = _load_json(TEMPLATES_FILE, None)
     if templates is None:
         templates = DEFAULT_TEMPLATES
+        
+    changed = False
+    for k, v in templates.items():
+        new_v = []
+        for item in v:
+            if isinstance(item, str):
+                new_v.append({"text": item, "enabled": True})
+                changed = True
+            else:
+                new_v.append(item)
+        templates[k] = new_v
+        
+    if changed or not os.path.exists(TEMPLATES_FILE):
         with _lock:
             _save_json(TEMPLATES_FILE, templates)
     return templates
@@ -108,7 +121,11 @@ def resolve_template(text, shuffle_seed, templates):
         key = body.strip().lower()
         options = templates.get(key)
         if options:
-            return str(rng.choice(options))
+            valid_options = [o["text"] for o in options if isinstance(o, dict) and o.get("enabled", True)]
+            if not valid_options: # Fallback to all texts if all disabled
+                valid_options = [o["text"] for o in options if isinstance(o, dict) and "text" in o]
+            if valid_options:
+                return str(rng.choice(valid_options))
         return match.group(0)  # unknown aspect: leave untouched
 
     # Resolve repeatedly so template entries may themselves contain placeholders.
@@ -165,12 +182,16 @@ class PromptManager:
                     "control_after_generate": True,
                     "tooltip": "Controls template placeholder picks. Set to 'randomize' to reshuffle aspects each run, 'fixed' to keep the current picks.",
                 }),
+                "debug_print": ("BOOLEAN", {"default": False, "tooltip": "Print final resolved prompt to terminal."}),
             }
         }
 
-    def run(self, prompt, shuffle_seed):
+    def run(self, prompt, shuffle_seed, debug_print=False):
         templates = load_templates()
         resolved = resolve_template(prompt, shuffle_seed, templates)
+
+        if debug_print:
+            print(f"\n[PromptManager] Final Prompt:\n{resolved}\n")
 
         save_history_entry({
             "prompt": prompt,
@@ -213,10 +234,10 @@ async def get_templates(request):
 async def set_templates(request):
     data = await request.json()
     if not isinstance(data, dict) or not all(
-        isinstance(v, list) and all(isinstance(o, str) for o in v)
+        isinstance(v, list) and all(isinstance(o, dict) and "text" in o for o in v)
         for v in data.values()
     ):
-        return web.json_response({"error": "templates must be {aspect: [string, ...]}"}, status=400)
+        return web.json_response({"error": "templates must be {aspect: [{'text': string, 'enabled': bool}, ...]}"}, status=400)
     with _lock:
         _save_json(TEMPLATES_FILE, {k.lower(): v for k, v in data.items()})
     return web.json_response({"ok": True})
