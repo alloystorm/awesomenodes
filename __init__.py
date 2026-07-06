@@ -25,6 +25,14 @@ MAX_HISTORY = 200
 _lock = threading.Lock()
 
 DEFAULT_TEMPLATES = {
+    "character": [
+        "a weathered old sailor",
+        "a young inventor with brass goggles",
+        "an elegant sorceress in flowing robes",
+        "a stoic android detective",
+        "a cheerful street musician",
+        "a battle-worn knight",
+    ],
     "scene": [
         "a bustling marketplace",
         "a quiet library",
@@ -47,20 +55,13 @@ DEFAULT_TEMPLATES = {
     "genre": [
         "cyberpunk",
         "dark fantasy",
-        "film noir",
+        "retro sci-fi",
+    ],
+    "style": [
         "studio ghibli style",
         "baroque oil painting",
-        "retro sci-fi",
         "photorealistic",
         "watercolor illustration",
-    ],
-    "character": [
-        "a weathered old sailor",
-        "a young inventor with brass goggles",
-        "an elegant sorceress in flowing robes",
-        "a stoic android detective",
-        "a cheerful street musician",
-        "a battle-worn knight",
     ],
 }
 
@@ -157,7 +158,7 @@ class PromptManager:
                     "multiline": True,
                     "default": "",
                     "dynamicPrompts": False,
-                    "tooltip": "Positive prompt. Supports {scene}, {environment}, {genre}, {character} and inline {a|b|c} placeholders.",
+                    "tooltip": "Positive prompt. Supports {character}, {scene}, {environment}, {genre}, {style} and inline {a|b|c} placeholders.",
                 }),
                 "shuffle_seed": ("INT", {
                     "default": 0, "min": 0, "max": 0xffffffffffffffff,
