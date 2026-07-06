@@ -34,10 +34,6 @@ function applyEntry(node, entry) {
         }
     };
     set("prompt", entry.prompt);
-    set("negative_prompt", entry.negative_prompt);
-    set("width", entry.width);
-    set("height", entry.height);
-    set("seed", entry.seed);
     set("shuffle_seed", entry.shuffle_seed);
     node.setDirtyCanvas(true, true);
 }
@@ -71,5 +67,257 @@ app.registerExtension({
 
             return result;
         };
+
+        const getExtraMenuOptions = nodeType.prototype.getExtraMenuOptions;
+        nodeType.prototype.getExtraMenuOptions = function(_, options) {
+            getExtraMenuOptions?.apply(this, arguments);
+            options.push({
+                content: "Edit Templates",
+                callback: () => {
+                    showTemplateEditor();
+                }
+            });
+        };
     },
 });
+
+async function showTemplateEditor() {
+    let templates = {};
+    try {
+        const res = await api.fetchApi("/prompt_manager/templates");
+        templates = await res.json();
+    } catch (e) {
+        alert("Failed to load templates");
+        return;
+    }
+    
+    if (Object.keys(templates).length === 0) {
+        templates = { "scene": [] };
+    }
+
+    let activeCategory = Object.keys(templates)[0];
+
+    const overlay = document.createElement("div");
+    Object.assign(overlay.style, {
+        position: "fixed", top: "0", left: "0", width: "100%", height: "100%",
+        backgroundColor: "rgba(0,0,0,0.7)", display: "flex", justifyContent: "center", alignItems: "center",
+        zIndex: "1000",
+    });
+
+    const dialog = document.createElement("div");
+    Object.assign(dialog.style, {
+        backgroundColor: "#222", color: "#fff", padding: "20px", borderRadius: "8px",
+        display: "flex", flexDirection: "column", width: "700px", height: "550px",
+        fontFamily: "sans-serif", boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
+    });
+
+    const title = document.createElement("h3");
+    title.innerText = "Edit Templates";
+    title.style.margin = "0 0 15px 0";
+    
+    const workspace = document.createElement("div");
+    Object.assign(workspace.style, {
+        display: "flex", flex: "1", border: "1px solid #444", borderRadius: "4px", overflow: "hidden"
+    });
+
+    // Left side: Tabs (Categories)
+    const sidebar = document.createElement("div");
+    Object.assign(sidebar.style, {
+        width: "180px", backgroundColor: "#1a1a1a", borderRight: "1px solid #444",
+        display: "flex", flexDirection: "column", overflowY: "auto"
+    });
+
+    // Right side: Items
+    const content = document.createElement("div");
+    Object.assign(content.style, {
+        flex: "1", backgroundColor: "#111", display: "flex", flexDirection: "column",
+        padding: "10px"
+    });
+
+    const listContainer = document.createElement("div");
+    Object.assign(listContainer.style, {
+        flex: "1", overflowY: "auto", marginBottom: "10px", display: "flex", flexDirection: "column", gap: "4px"
+    });
+    
+    const addRow = document.createElement("div");
+    Object.assign(addRow.style, {
+        display: "flex", gap: "10px"
+    });
+    
+    const addInput = document.createElement("input");
+    addInput.type = "text";
+    addInput.placeholder = "New template item...";
+    Object.assign(addInput.style, {
+        flex: "1", padding: "8px", backgroundColor: "#333", color: "#fff",
+        border: "1px solid #555", borderRadius: "4px", outline: "none"
+    });
+    
+    const addBtn = document.createElement("button");
+    addBtn.innerText = "Add";
+    Object.assign(addBtn.style, {
+        padding: "8px 16px", backgroundColor: "#2196F3", color: "#fff",
+        border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold"
+    });
+    
+    // Bottom: Cancel/Save
+    const btnRow = document.createElement("div");
+    Object.assign(btnRow.style, {
+        display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "15px",
+    });
+
+    const baseBtnStyle = {
+        padding: "8px 16px", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "14px", fontWeight: "bold"
+    };
+
+    const closeBtn = document.createElement("button");
+    closeBtn.innerText = "Cancel";
+    Object.assign(closeBtn.style, baseBtnStyle, { backgroundColor: "#555", color: "#fff" });
+    closeBtn.onclick = () => document.body.removeChild(overlay);
+
+    const saveBtn = document.createElement("button");
+    saveBtn.innerText = "Save";
+    Object.assign(saveBtn.style, baseBtnStyle, { backgroundColor: "#4CAF50", color: "#fff" });
+    
+    const addCategoryBtn = document.createElement("button");
+    addCategoryBtn.innerText = "+ New Category";
+    Object.assign(addCategoryBtn.style, {
+        padding: "10px", backgroundColor: "#222", color: "#ccc", border: "none",
+        borderTop: "1px solid #444", cursor: "pointer", textAlign: "left", fontSize: "12px",
+        marginTop: "auto"
+    });
+    addCategoryBtn.onclick = () => {
+        const name = prompt("Category name (e.g. 'style'):");
+        if (name && !templates[name]) {
+            templates[name] = [];
+            activeCategory = name;
+            render();
+        }
+    };
+
+    function render() {
+        sidebar.innerHTML = "";
+        for (const cat of Object.keys(templates)) {
+            const catBtn = document.createElement("div");
+            Object.assign(catBtn.style, {
+                padding: "10px", cursor: "pointer", borderBottom: "1px solid #333",
+                backgroundColor: activeCategory === cat ? "#333" : "transparent",
+                color: activeCategory === cat ? "#fff" : "#aaa",
+                fontWeight: activeCategory === cat ? "bold" : "normal",
+                display: "flex", justifyContent: "space-between", alignItems: "center"
+            });
+            
+            const nameSpan = document.createElement("span");
+            nameSpan.innerText = cat;
+            nameSpan.style.flex = "1";
+            catBtn.appendChild(nameSpan);
+
+            const delCatBtn = document.createElement("span");
+            delCatBtn.innerText = "×";
+            Object.assign(delCatBtn.style, {
+                color: "#ff5555", padding: "0 5px", fontSize: "16px", fontWeight: "bold"
+            });
+            delCatBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (confirm(`Delete category '${cat}' and all its items?`)) {
+                    delete templates[cat];
+                    if (activeCategory === cat) activeCategory = Object.keys(templates)[0];
+                    render();
+                }
+            };
+            catBtn.appendChild(delCatBtn);
+
+            catBtn.onclick = () => {
+                activeCategory = cat;
+                render();
+            };
+            sidebar.appendChild(catBtn);
+        }
+        sidebar.appendChild(addCategoryBtn);
+
+        listContainer.innerHTML = "";
+        if (!activeCategory || !templates[activeCategory]) return;
+        
+        const items = templates[activeCategory];
+        items.forEach((item, index) => {
+            const itemRow = document.createElement("div");
+            Object.assign(itemRow.style, {
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "8px", backgroundColor: "#1a1a1a", borderRadius: "4px"
+            });
+            
+            const itemText = document.createElement("span");
+            itemText.innerText = item;
+            itemText.style.flex = "1";
+            itemText.style.wordBreak = "break-all";
+
+            const delBtn = document.createElement("button");
+            delBtn.innerText = "Delete";
+            Object.assign(delBtn.style, {
+                padding: "4px 8px", backgroundColor: "#f44336", color: "#fff",
+                border: "none", borderRadius: "3px", cursor: "pointer", fontSize: "12px", marginLeft: "10px"
+            });
+            delBtn.onclick = () => {
+                items.splice(index, 1);
+                render();
+            };
+            
+            itemRow.appendChild(itemText);
+            itemRow.appendChild(delBtn);
+            listContainer.appendChild(itemRow);
+        });
+    }
+
+    addBtn.onclick = () => {
+        if (!activeCategory) return;
+        const val = addInput.value.trim();
+        if (val) {
+            templates[activeCategory].push(val);
+            addInput.value = "";
+            render();
+            listContainer.scrollTop = listContainer.scrollHeight;
+        }
+    };
+    
+    addInput.onkeydown = (e) => {
+        if (e.key === "Enter") {
+            addBtn.click();
+        }
+    };
+
+    saveBtn.onclick = async () => {
+        try {
+            const res = await api.fetchApi("/prompt_manager/templates", {
+                method: "POST",
+                body: JSON.stringify(templates),
+            });
+            if (res.status === 200) {
+                document.body.removeChild(overlay);
+            } else {
+                const err = await res.json();
+                alert("Error saving: " + (err.error || "Unknown"));
+            }
+        } catch (e) {
+            alert("Network error: " + e.message);
+        }
+    };
+
+    addRow.appendChild(addInput);
+    addRow.appendChild(addBtn);
+    content.appendChild(listContainer);
+    content.appendChild(addRow);
+    
+    workspace.appendChild(sidebar);
+    workspace.appendChild(content);
+
+    btnRow.appendChild(closeBtn);
+    btnRow.appendChild(saveBtn);
+
+    dialog.appendChild(title);
+    dialog.appendChild(workspace);
+    dialog.appendChild(btnRow);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    render();
+    addInput.focus();
+}
