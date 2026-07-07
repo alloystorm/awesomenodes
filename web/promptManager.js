@@ -35,6 +35,7 @@ function applyEntry(node, entry) {
     };
     set("prompt", entry.prompt);
     set("shuffle_seed", entry.shuffle_seed);
+    if (entry.pages !== undefined) set("pages", entry.pages);
     node.setDirtyCanvas(true, true);
 }
 

@@ -105,7 +105,7 @@ def load_templates():
     return templates
 
 
-def resolve_template(text, shuffle_seed, templates):
+def resolve_template(text, shuffle_seed, templates, current_page=1):
     """Replace {aspect} and inline {a|b|c} placeholders.
 
     Picks are deterministic for a given shuffle_seed, so a fixed seed keeps
@@ -115,6 +115,9 @@ def resolve_template(text, shuffle_seed, templates):
 
     def replace(match):
         body = match.group(1)
+        if body.strip().lower() == "page":
+            return str(current_page)
+            
         if "|" in body:
             options = [o.strip() for o in body.split("|") if o.strip()]
             return rng.choice(options) if options else ""
@@ -175,7 +178,11 @@ class PromptManager:
                     "multiline": True,
                     "default": "",
                     "dynamicPrompts": False,
-                    "tooltip": "Positive prompt. Supports {character}, {scene}, {environment}, {genre}, {style} and inline {a|b|c} placeholders.",
+                    "tooltip": "Positive prompt. Supports {character}, {scene}, {environment}, {genre}, {style}, {page}, and inline {a|b|c} placeholders.",
+                }),
+                "pages": ("INT", {
+                    "default": 1, "min": 1, "max": 10000,
+                    "tooltip": "Keep the same templates for N runs. Use {page} in your prompt to print the current counter.",
                 }),
                 "shuffle_seed": ("INT", {
                     "default": 0, "min": 0, "max": 0xffffffffffffffff,
@@ -186,17 +193,35 @@ class PromptManager:
             }
         }
 
-    def run(self, prompt, shuffle_seed, debug_print=False):
+    def run(self, prompt, pages, shuffle_seed, debug_print=False):
+        if not hasattr(self, "run_counter"):
+            self.run_counter = 0
+            self.locked_seed = shuffle_seed
+            self.target_pages = pages
+
+        if getattr(self, "target_pages", 1) != pages:
+            self.run_counter = 0
+            self.target_pages = pages
+            self.locked_seed = shuffle_seed
+            
+        if self.run_counter >= self.target_pages:
+            self.run_counter = 0
+            self.locked_seed = shuffle_seed
+            
+        self.run_counter += 1
+        current_page = self.run_counter
+
         templates = load_templates()
-        resolved = resolve_template(prompt, shuffle_seed, templates)
+        resolved = resolve_template(prompt, self.locked_seed, templates, current_page=current_page)
 
         if debug_print:
-            print(f"\n[PromptManager] Final Prompt:\n{resolved}\n")
+            print(f"\n[PromptManager] Final Prompt (Page {current_page}/{pages}):\n{resolved}\n")
 
         save_history_entry({
             "prompt": prompt,
             "resolved_prompt": resolved,
             "shuffle_seed": shuffle_seed,
+            "pages": pages,
             "timestamp": time.time(),
         })
 
