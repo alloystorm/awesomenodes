@@ -80,16 +80,25 @@ app.registerExtension({
             );
             historyWidget.serialize = false;
 
-            // The "enhancer" input arrives as a plain STRING widget; turn it
-            // into a combo bound to the live enhancer name list while keeping
-            // the same widget object so its value still serializes normally.
-            const enhancerWidget = this.widgets?.find((w) => w.name === "enhancer");
-            if (enhancerWidget) {
-                enhancerWidget.type = "combo";
-                enhancerWidget.options = {
-                    ...(enhancerWidget.options || {}),
-                    values: () => [NONE_ENHANCER, ...Object.keys(enhancerCache)],
-                };
+            // The "enhancer" input arrives as a plain text widget; mutating
+            // its .type in place doesn't take effect in the current frontend
+            // (widgets are rendered by the component bound at creation), so
+            // remove it and add a real combo widget with the same name in
+            // its place — same technique as the "history" widget above.
+            const enhancerIndex = this.widgets?.findIndex((w) => w.name === "enhancer") ?? -1;
+            if (enhancerIndex !== -1) {
+                const oldValue = this.widgets[enhancerIndex].value || NONE_ENHANCER;
+                this.widgets.splice(enhancerIndex, 1);
+                this.addWidget(
+                    "combo",
+                    "enhancer",
+                    oldValue,
+                    () => {},
+                    { values: () => [NONE_ENHANCER, ...Object.keys(enhancerCache)] },
+                );
+                // addWidget appends to the end; move it back to where the
+                // original text widget was for a stable layout.
+                this.widgets.splice(enhancerIndex, 0, this.widgets.pop());
             }
 
             return result;
