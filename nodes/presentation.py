@@ -30,6 +30,10 @@ class PresentationNode:
                 "images": ("IMAGE", {"tooltip": "The images to present."}),
                 "layout": (["1x1", "2x1", "2x2", "3x3"], {"default": "1x1"}),
                 "save_mode": (["auto", "manual"], {"default": "manual"}),
+                "prompt_text": ("STRING", {
+                    "multiline": True, "default": "",
+                    "tooltip": "If set, saved as a .txt file next to each image using the same filename.",
+                }),
             },
             "hidden": {
                 "prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"
@@ -42,7 +46,7 @@ class PresentationNode:
     CATEGORY = "image"
     DESCRIPTION = "Displays images in a full-screen presentation grid and optionally saves them."
 
-    def present_images(self, images, layout="1x1", save_mode="manual", prompt=None, extra_pnginfo=None):
+    def present_images(self, images, layout="1x1", save_mode="manual", prompt_text="", prompt=None, extra_pnginfo=None):
         results = list()
 
         # Determine target directory and type based on save_mode
@@ -79,10 +83,16 @@ class PresentationNode:
             filepath = os.path.join(full_output_folder, file)
             img.save(filepath, pnginfo=metadata, compress_level=self.compress_level)
 
+            if save_mode == "auto" and prompt_text:
+                txt_path = os.path.splitext(filepath)[0] + ".txt"
+                with open(txt_path, "w", encoding="utf-8") as f:
+                    f.write(prompt_text)
+
             results.append({
                 "filename": file,
                 "subfolder": subfolder,
-                "type": target_type
+                "type": target_type,
+                "prompt_text": prompt_text,
             })
             counter += 1
 
@@ -98,6 +108,7 @@ async def save_presentation_image(request):
     filename = data.get("filename")
     subfolder = data.get("subfolder", "")
     type = data.get("type", "temp")
+    prompt_text = data.get("prompt_text", "")
 
     if not filename:
         return web.json_response({"error": "No filename provided"}, status=400)
@@ -119,6 +130,10 @@ async def save_presentation_image(request):
 
     try:
         shutil.copy2(source_path, dest_path)
+        if prompt_text:
+            txt_dest = os.path.splitext(dest_path)[0] + ".txt"
+            with open(txt_dest, "w", encoding="utf-8") as f:
+                f.write(prompt_text)
         return web.json_response({"ok": True, "saved_to": dest_file})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)

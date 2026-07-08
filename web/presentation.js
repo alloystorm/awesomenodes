@@ -94,7 +94,8 @@ function saveImage(imageInfo, btnElement) {
         body: JSON.stringify({
             filename: imageInfo.filename,
             subfolder: imageInfo.subfolder,
-            type: imageInfo.type
+            type: imageInfo.type,
+            prompt_text: imageInfo.prompt_text || ""
         })
     }).then(res => res.json()).then(data => {
         if (data.ok) {

@@ -98,7 +98,7 @@ into:
 ## Node: `Presentation Image Saver` (image)
 
 **Input:** `images` (IMAGE batch), `layout` (1x1/2x1/2x2/3x3),
-`save_mode` (auto/manual)
+`save_mode` (auto/manual), `prompt_text` (STRING, optional)
 
 Adds a **Present (Full Screen)** button to the node that opens a full-screen
 grid showing the images as they arrive. In `manual` save mode, each image
@@ -106,8 +106,16 @@ gets a **Save** button to copy it from the temp directory into the output
 directory; in `auto` mode, images are saved to the output directory
 immediately and marked as already saved.
 
+If `prompt_text` is non-empty, it's saved as a `.txt` file next to each
+image using the same filename (e.g. `ComfyUI_00001_.png` +
+`ComfyUI_00001_.txt`) — written at save time, so in `manual` mode this
+happens when you click **Save**, not when the image first appears. Wire
+Prompt Manager's `prompt` output (or any STRING) into it to keep the actual
+prompt alongside each saved image.
+
 ### API
 
 - `POST /presentation_node/save` — body
-  `{"filename", "subfolder", "type"}`, copies a temp image into the output
-  directory
+  `{"filename", "subfolder", "type", "prompt_text"}`, copies a temp image
+  into the output directory (and its `.txt` companion, if `prompt_text` is
+  set)
