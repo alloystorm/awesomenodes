@@ -101,6 +101,12 @@ app.registerExtension({
                 this.widgets.splice(enhancerIndex, 0, this.widgets.pop());
             }
 
+            const editTemplatesBtn = this.addWidget("button", "Edit Templates", "edit_templates", () => showTemplateEditor());
+            editTemplatesBtn.serialize = false;
+
+            const editEnhancersBtn = this.addWidget("button", "Edit Enhancers", "edit_enhancers", () => showEnhancerEditor());
+            editEnhancersBtn.serialize = false;
+
             return result;
         };
 
@@ -137,8 +143,8 @@ async function showTemplateEditor() {
         templates = { "scene": [] };
     }
 
-    let activeCategory = Object.keys(templates)[0];
-    let dragSrcIndex = null;
+    const COL_WIDTH = 220;
+    let dragSrc = null; // { category, index }
 
     const overlay = document.createElement("div");
     Object.assign(overlay.style, {
@@ -150,62 +156,229 @@ async function showTemplateEditor() {
     const dialog = document.createElement("div");
     Object.assign(dialog.style, {
         backgroundColor: "#222", color: "#fff", padding: "20px", borderRadius: "8px",
-        display: "flex", flexDirection: "column", width: "700px", height: "550px",
+        display: "flex", flexDirection: "column", width: "min(95vw, 1200px)", height: "min(85vh, 700px)",
         fontFamily: "sans-serif", boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
     });
 
     const title = document.createElement("h3");
     title.innerText = "Edit Templates";
+    title.style.margin = "0 0 4px 0";
     const subtitle = document.createElement("div");
-    subtitle.innerText = "Drag items (⠿) to reorder — order determines which item the shuffle seed picks.";
-    Object.assign(subtitle.style, { color: "#888", fontSize: "11px", margin: "-10px 0 12px 0" });
-    title.style.margin = "0 0 15px 0";
+    subtitle.innerText = "Drag ⠿ to reorder within a column — the row number is the index the shuffle seed picks (index = seed % count).";
+    Object.assign(subtitle.style, { color: "#888", fontSize: "11px", margin: "0 0 12px 0" });
 
-    const workspace = document.createElement("div");
-    Object.assign(workspace.style, {
-        display: "flex", flex: "1", border: "1px solid #444", borderRadius: "4px", overflow: "hidden"
+    const tableWrap = document.createElement("div");
+    Object.assign(tableWrap.style, {
+        flex: "1", overflow: "auto", border: "1px solid #444", borderRadius: "4px", backgroundColor: "#111",
     });
 
-    // Left side: Tabs (Categories)
-    const sidebar = document.createElement("div");
-    Object.assign(sidebar.style, {
-        width: "180px", backgroundColor: "#1a1a1a", borderRight: "1px solid #444",
-        display: "flex", flexDirection: "column", overflowY: "auto"
-    });
+    const table = document.createElement("table");
+    Object.assign(table.style, { borderCollapse: "collapse", width: "100%" });
 
-    // Right side: Items
-    const content = document.createElement("div");
-    Object.assign(content.style, {
-        flex: "1", backgroundColor: "#111", display: "flex", flexDirection: "column",
-        padding: "10px"
-    });
+    function styleCell(el, extra) {
+        Object.assign(el.style, {
+            border: "1px solid #333", padding: "4px 6px", verticalAlign: "top", boxSizing: "border-box",
+            ...extra,
+        });
+        return el;
+    }
 
-    const listContainer = document.createElement("div");
-    Object.assign(listContainer.style, {
-        flex: "1", overflowY: "auto", marginBottom: "10px", display: "flex", flexDirection: "column", gap: "4px"
-    });
+    function render() {
+        table.innerHTML = "";
+        const categories = Object.keys(templates);
+        const maxLen = Math.max(0, ...categories.map((c) => templates[c].length));
 
-    const addRow = document.createElement("div");
-    Object.assign(addRow.style, {
-        display: "flex", gap: "10px"
-    });
+        // Header row: category name + delete-category, plus a trailing "+ column" cell.
+        const thead = document.createElement("thead");
+        const headRow = document.createElement("tr");
 
-    const addInput = document.createElement("input");
-    addInput.type = "text";
-    addInput.placeholder = "New template item...";
-    Object.assign(addInput.style, {
-        flex: "1", padding: "8px", backgroundColor: "#333", color: "#fff",
-        border: "1px solid #555", borderRadius: "4px", outline: "none"
-    });
+        const cornerTh = document.createElement("th");
+        styleCell(cornerTh, {
+            position: "sticky", top: "0", left: "0", zIndex: "3", backgroundColor: "#1a1a1a",
+            width: "34px", minWidth: "34px",
+        });
+        headRow.appendChild(cornerTh);
 
-    const addBtn = document.createElement("button");
-    addBtn.innerText = "Add";
-    Object.assign(addBtn.style, {
-        padding: "8px 16px", backgroundColor: "#2196F3", color: "#fff",
-        border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold"
-    });
+        for (const cat of categories) {
+            const th = document.createElement("th");
+            styleCell(th, {
+                position: "sticky", top: "0", zIndex: "2", backgroundColor: "#1a1a1a",
+                width: COL_WIDTH + "px", minWidth: COL_WIDTH + "px", textAlign: "left",
+            });
 
-    // Bottom: Cancel/Save
+            const headInner = document.createElement("div");
+            Object.assign(headInner.style, { display: "flex", alignItems: "center", gap: "6px" });
+
+            const nameSpan = document.createElement("span");
+            nameSpan.innerText = cat;
+            Object.assign(nameSpan.style, {
+                flex: "1", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            });
+
+            const delCatBtn = document.createElement("span");
+            delCatBtn.innerText = "×";
+            Object.assign(delCatBtn.style, { color: "#ff5555", cursor: "pointer", fontWeight: "bold", padding: "0 4px" });
+            delCatBtn.onclick = () => {
+                if (confirm(`Delete category '${cat}' and all its items?`)) {
+                    delete templates[cat];
+                    render();
+                }
+            };
+
+            headInner.appendChild(nameSpan);
+            headInner.appendChild(delCatBtn);
+            th.appendChild(headInner);
+            headRow.appendChild(th);
+        }
+
+        const addCatTh = document.createElement("th");
+        styleCell(addCatTh, {
+            position: "sticky", top: "0", zIndex: "2", backgroundColor: "#1a1a1a",
+            width: "48px", minWidth: "48px",
+        });
+        const addCatBtn = document.createElement("button");
+        addCatBtn.innerText = "+";
+        addCatBtn.title = "New category";
+        Object.assign(addCatBtn.style, {
+            width: "100%", padding: "4px", backgroundColor: "#2196F3", color: "#fff",
+            border: "none", borderRadius: "3px", cursor: "pointer", fontWeight: "bold",
+        });
+        addCatBtn.onclick = () => {
+            const name = prompt("Category name (e.g. 'style'):");
+            if (name && !templates[name]) {
+                templates[name] = [];
+                render();
+            }
+        };
+        addCatTh.appendChild(addCatBtn);
+        headRow.appendChild(addCatTh);
+
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        // Body rows: one per index position, aligned across all category columns.
+        const tbody = document.createElement("tbody");
+
+        for (let i = 0; i < maxLen; i++) {
+            const tr = document.createElement("tr");
+
+            const rowNumTd = document.createElement("td");
+            styleCell(rowNumTd, {
+                position: "sticky", left: "0", zIndex: "1", backgroundColor: "#1a1a1a",
+                color: "#666", textAlign: "center", fontSize: "11px",
+            });
+            rowNumTd.innerText = String(i);
+            tr.appendChild(rowNumTd);
+
+            for (const cat of categories) {
+                const items = templates[cat];
+                const td = document.createElement("td");
+                styleCell(td, {});
+
+                if (i < items.length) {
+                    const item = items[i];
+                    const cellRow = document.createElement("div");
+                    Object.assign(cellRow.style, { display: "flex", alignItems: "center", gap: "6px" });
+
+                    td.ondragover = (e) => {
+                        if (!dragSrc || dragSrc.category !== cat) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        td.style.boxShadow = "inset 0 2px 0 #2196F3";
+                    };
+                    td.ondragleave = () => { td.style.boxShadow = ""; };
+                    td.ondrop = (e) => {
+                        e.preventDefault();
+                        td.style.boxShadow = "";
+                        if (!dragSrc || dragSrc.category !== cat || dragSrc.index === i) return;
+                        const [moved] = items.splice(dragSrc.index, 1);
+                        items.splice(i, 0, moved);
+                        dragSrc = null;
+                        render();
+                    };
+
+                    const dragHandle = document.createElement("span");
+                    dragHandle.innerText = "⠿";
+                    dragHandle.draggable = true;
+                    Object.assign(dragHandle.style, { color: "#666", cursor: "grab" });
+                    dragHandle.ondragstart = (e) => {
+                        dragSrc = { category: cat, index: i };
+                        e.dataTransfer.effectAllowed = "move";
+                        cellRow.style.opacity = "0.4";
+                    };
+                    dragHandle.ondragend = () => {
+                        dragSrc = null;
+                        cellRow.style.opacity = "1";
+                    };
+
+                    const checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.checked = item.enabled !== false; // default true
+                    checkbox.onchange = (e) => { item.enabled = e.target.checked; };
+
+                    const textInput = document.createElement("input");
+                    textInput.type = "text";
+                    textInput.value = item.text || item; // fallback if somehow still string
+                    Object.assign(textInput.style, {
+                        flex: "1", minWidth: "0", padding: "3px 5px", backgroundColor: "#1a1a1a", color: "#fff",
+                        border: "1px solid #333", borderRadius: "3px", outline: "none", fontSize: "12px",
+                    });
+                    textInput.oninput = (e) => { item.text = e.target.value; };
+
+                    const delBtn = document.createElement("span");
+                    delBtn.innerText = "×";
+                    Object.assign(delBtn.style, { color: "#ff5555", cursor: "pointer", fontWeight: "bold", padding: "0 2px" });
+                    delBtn.onclick = () => {
+                        items.splice(i, 1);
+                        render();
+                    };
+
+                    cellRow.appendChild(dragHandle);
+                    cellRow.appendChild(checkbox);
+                    cellRow.appendChild(textInput);
+                    cellRow.appendChild(delBtn);
+                    td.appendChild(cellRow);
+                }
+
+                tr.appendChild(td);
+            }
+
+            tr.appendChild(styleCell(document.createElement("td"), {}));
+            tbody.appendChild(tr);
+        }
+
+        // Trailing "add item" row, one input per category column.
+        const addTr = document.createElement("tr");
+        addTr.appendChild(styleCell(document.createElement("td"), { position: "sticky", left: "0", backgroundColor: "#1a1a1a" }));
+
+        for (const cat of categories) {
+            const td = document.createElement("td");
+            styleCell(td, {});
+            const input = document.createElement("input");
+            input.type = "text";
+            input.placeholder = "+ add item";
+            Object.assign(input.style, {
+                width: "100%", padding: "3px 5px", backgroundColor: "#111", color: "#fff",
+                border: "1px dashed #444", borderRadius: "3px", outline: "none", fontSize: "12px", boxSizing: "border-box",
+            });
+            input.onkeydown = (e) => {
+                if (e.key === "Enter") {
+                    const val = input.value.trim();
+                    if (val) {
+                        templates[cat].push({ text: val, enabled: true });
+                        render();
+                    }
+                }
+            };
+            td.appendChild(input);
+            addTr.appendChild(td);
+        }
+        addTr.appendChild(styleCell(document.createElement("td"), {}));
+        tbody.appendChild(addTr);
+
+        table.appendChild(tbody);
+    }
+
     const btnRow = document.createElement("div");
     Object.assign(btnRow.style, {
         display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "15px",
@@ -223,161 +396,6 @@ async function showTemplateEditor() {
     const saveBtn = document.createElement("button");
     saveBtn.innerText = "Save";
     Object.assign(saveBtn.style, baseBtnStyle, { backgroundColor: "#4CAF50", color: "#fff" });
-
-    const addCategoryBtn = document.createElement("button");
-    addCategoryBtn.innerText = "+ New Category";
-    Object.assign(addCategoryBtn.style, {
-        padding: "10px", backgroundColor: "#222", color: "#ccc", border: "none",
-        borderTop: "1px solid #444", cursor: "pointer", textAlign: "left", fontSize: "12px",
-        marginTop: "auto"
-    });
-    addCategoryBtn.onclick = () => {
-        const name = prompt("Category name (e.g. 'style'):");
-        if (name && !templates[name]) {
-            templates[name] = [];
-            activeCategory = name;
-            render();
-        }
-    };
-
-    function render() {
-        sidebar.innerHTML = "";
-        for (const cat of Object.keys(templates)) {
-            const catBtn = document.createElement("div");
-            Object.assign(catBtn.style, {
-                padding: "10px", cursor: "pointer", borderBottom: "1px solid #333",
-                backgroundColor: activeCategory === cat ? "#333" : "transparent",
-                color: activeCategory === cat ? "#fff" : "#aaa",
-                fontWeight: activeCategory === cat ? "bold" : "normal",
-                display: "flex", justifyContent: "space-between", alignItems: "center"
-            });
-
-            const nameSpan = document.createElement("span");
-            nameSpan.innerText = cat;
-            nameSpan.style.flex = "1";
-            catBtn.appendChild(nameSpan);
-
-            const delCatBtn = document.createElement("span");
-            delCatBtn.innerText = "×";
-            Object.assign(delCatBtn.style, {
-                color: "#ff5555", padding: "0 5px", fontSize: "16px", fontWeight: "bold"
-            });
-            delCatBtn.onclick = (e) => {
-                e.stopPropagation();
-                if (confirm(`Delete category '${cat}' and all its items?`)) {
-                    delete templates[cat];
-                    if (activeCategory === cat) activeCategory = Object.keys(templates)[0];
-                    render();
-                }
-            };
-            catBtn.appendChild(delCatBtn);
-
-            catBtn.onclick = () => {
-                activeCategory = cat;
-                render();
-            };
-            sidebar.appendChild(catBtn);
-        }
-        sidebar.appendChild(addCategoryBtn);
-
-        listContainer.innerHTML = "";
-        if (!activeCategory || !templates[activeCategory]) return;
-
-        const items = templates[activeCategory];
-        items.forEach((item, index) => {
-            const itemRow = document.createElement("div");
-            itemRow.draggable = true;
-            Object.assign(itemRow.style, {
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "8px", backgroundColor: "#1a1a1a", borderRadius: "4px", cursor: "grab"
-            });
-
-            itemRow.ondragstart = (e) => {
-                dragSrcIndex = index;
-                e.dataTransfer.effectAllowed = "move";
-                itemRow.style.opacity = "0.4";
-            };
-            itemRow.ondragend = () => {
-                dragSrcIndex = null;
-                itemRow.style.opacity = "1";
-            };
-            itemRow.ondragover = (e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                itemRow.style.borderTop = "2px solid #2196F3";
-            };
-            itemRow.ondragleave = () => {
-                itemRow.style.borderTop = "";
-            };
-            itemRow.ondrop = (e) => {
-                e.preventDefault();
-                itemRow.style.borderTop = "";
-                if (dragSrcIndex === null || dragSrcIndex === index) return;
-                const [moved] = items.splice(dragSrcIndex, 1);
-                items.splice(index, 0, moved);
-                dragSrcIndex = null;
-                render();
-            };
-
-            const dragHandle = document.createElement("span");
-            dragHandle.innerText = "⠿";
-            Object.assign(dragHandle.style, { color: "#666", cursor: "grab", padding: "0 2px" });
-
-            const leftGroup = document.createElement("div");
-            Object.assign(leftGroup.style, {
-                display: "flex", alignItems: "center", gap: "10px", flex: "1", overflow: "hidden"
-            });
-
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.checked = item.enabled !== false; // default true
-            checkbox.onchange = (e) => {
-                item.enabled = e.target.checked;
-            };
-
-            const itemText = document.createElement("span");
-            itemText.innerText = item.text || item; // fallback if somehow still string
-            itemText.style.flex = "1";
-            itemText.style.wordBreak = "break-all";
-
-            leftGroup.appendChild(dragHandle);
-            leftGroup.appendChild(checkbox);
-            leftGroup.appendChild(itemText);
-
-            const delBtn = document.createElement("button");
-            delBtn.innerText = "Delete";
-            Object.assign(delBtn.style, {
-                padding: "4px 8px", backgroundColor: "#f44336", color: "#fff",
-                border: "none", borderRadius: "3px", cursor: "pointer", fontSize: "12px", marginLeft: "10px"
-            });
-            delBtn.onclick = () => {
-                items.splice(index, 1);
-                render();
-            };
-
-            itemRow.appendChild(leftGroup);
-            itemRow.appendChild(delBtn);
-            listContainer.appendChild(itemRow);
-        });
-    }
-
-    addBtn.onclick = () => {
-        if (!activeCategory) return;
-        const val = addInput.value.trim();
-        if (val) {
-            templates[activeCategory].push({ text: val, enabled: true });
-            addInput.value = "";
-            render();
-            listContainer.scrollTop = listContainer.scrollHeight;
-        }
-    };
-
-    addInput.onkeydown = (e) => {
-        if (e.key === "Enter") {
-            addBtn.click();
-        }
-    };
-
     saveBtn.onclick = async () => {
         try {
             const res = await api.fetchApi("/prompt_manager/templates", {
@@ -395,26 +413,19 @@ async function showTemplateEditor() {
         }
     };
 
-    addRow.appendChild(addInput);
-    addRow.appendChild(addBtn);
-    content.appendChild(listContainer);
-    content.appendChild(addRow);
-
-    workspace.appendChild(sidebar);
-    workspace.appendChild(content);
-
     btnRow.appendChild(closeBtn);
     btnRow.appendChild(saveBtn);
 
+    tableWrap.appendChild(table);
+
     dialog.appendChild(title);
     dialog.appendChild(subtitle);
-    dialog.appendChild(workspace);
+    dialog.appendChild(tableWrap);
     dialog.appendChild(btnRow);
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
 
     render();
-    addInput.focus();
 }
 
 async function showEnhancerEditor() {

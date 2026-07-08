@@ -22,10 +22,11 @@ The prompt may contain placeholders:
   with a pick from the corresponding list in `templates.json` (in this node's
   folder). Add your own aspects by adding keys to that file; any `{key}`
   matching a key is resolved. Template entries may themselves contain
-  placeholders (resolved up to 5 levels). Each entry can be disabled without
-  deleting it, and dragged (via the ⠿ handle) to reorder — use the node's
-  right-click **Edit Templates** dialog to toggle/add/remove/reorder entries
-  per category.
+  placeholders (resolved up to 5 levels). Click the node's **Edit Templates**
+  button (also available via right-click) to open a spreadsheet-style
+  table — one column per category, one row per item index: tick a checkbox
+  to enable/disable an item, edit its text directly in its cell, drag the ⠿
+  handle to reorder within a column, or add/delete whole categories/items.
 - `{option a|option b|option c}` — inline options, one is picked.
 - `{page}` — replaced with the current page counter (see **Pages** below).
 - Unknown placeholders are left untouched.
@@ -68,9 +69,9 @@ The **`enhancer`** dropdown selects a saved system/enhancer instruction (e.g.
 a prompt-rewriting instruction for an LLM text encoder) whose text is emitted
 as the `enhancer_instruction` output — wire it together with `prompt` into a
 "Generate Text" node to drive prompt enhancement. Manage the saved list (add,
-edit, delete) via the node's right-click **Edit Enhancers** dialog; entries
-are stored in `enhancers.json` (seeded with a "Comic Page Art Director"
-example). Selecting `None` outputs an empty string.
+edit, delete) via the node's **Edit Enhancers** button (also available via
+right-click); entries are stored in `enhancers.json` (seeded with a "Comic
+Page Art Director" example). Selecting `None` outputs an empty string.
 
 Since `Generate Text`'s single `prompt` input expects the full chat-formatted
 text, combine the two outputs into the model's chat template yourself, e.g.
