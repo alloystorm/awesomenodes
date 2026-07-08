@@ -10,7 +10,7 @@ single custom_nodes package.
 
 ## Node: `Prompt Manager` (utils/prompt)
 
-**Output:** `prompt` (STRING)
+**Outputs:** `prompt` (STRING), `enhancer_instruction` (STRING)
 
 Wire `prompt` into your CLIP Text Encode node to drive it from one place.
 
@@ -55,7 +55,30 @@ print the final resolved prompt to the console each run.
 
 Every executed run is saved to `history.json` (last 200, deduped, newest
 first). The **`history`** dropdown on the node lists past prompts; selecting
-an entry restores the prompt, pages and shuffle seed into the node.
+an entry restores the prompt, pages, shuffle seed and enhancer into the node.
+
+### Enhancers
+
+The **`enhancer`** dropdown selects a saved system/enhancer instruction (e.g.
+a prompt-rewriting instruction for an LLM text encoder) whose text is emitted
+as the `enhancer_instruction` output — wire it together with `prompt` into a
+"Generate Text" node to drive prompt enhancement. Manage the saved list (add,
+edit, delete) via the node's right-click **Edit Enhancers** dialog; entries
+are stored in `enhancers.json` (seeded with a "Comic Page Art Director"
+example). Selecting `None` outputs an empty string.
+
+Since `Generate Text`'s single `prompt` input expects the full chat-formatted
+text, combine the two outputs into the model's chat template yourself, e.g.
+for Qwen-style models via a `StringConcatenate`/`StringFormat` node chain
+into:
+
+```
+<|im_start|>system
+{enhancer_instruction}<|im_end|>
+<|im_start|>user
+{prompt}<|im_end|>
+<|im_start|>assistant
+```
 
 ### API
 
@@ -64,6 +87,8 @@ an entry restores the prompt, pages and shuffle seed into the node.
   one entry; `{}` clears all
 - `GET` / `POST /prompt_manager/templates` — read/replace the aspect lists
   (`{aspect: [{"text": string, "enabled": bool}, ...]}`)
+- `GET` / `POST /prompt_manager/enhancers` — read/replace the saved enhancer
+  instructions (`{name: instruction_text}`)
 
 ## Node: `Presentation Image Saver` (image)
 
