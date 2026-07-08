@@ -2,13 +2,13 @@
 
 Supplies a prompt to a workflow, keeps a local history of used prompts
 (selectable from a dropdown on the node), and supports template placeholders
-like {scene}, {environment}, {genre}, {character} that are shuffled between
-runs via a dedicated shuffle seed.
+like {scene}, {environment}, {genre}, {character} whose picks are indexed by
+a dedicated shuffle seed (index = seed % item count), so incrementing the
+seed steps deterministically through each list in order.
 """
 
 import json
 import os
-import random
 import re
 import threading
 import time
@@ -174,10 +174,13 @@ def load_enhancers():
 def resolve_template(text, shuffle_seed, templates, current_page=1):
     """Replace {aspect} and inline {a|b|c} placeholders.
 
-    Picks are deterministic for a given shuffle_seed, so a fixed seed keeps
-    the same picks across runs and a randomized seed reshuffles them.
+    Each placeholder picks item index = shuffle_seed % item_count: a fixed
+    seed always yields the same picks, and incrementing shuffle_seed steps
+    deterministically through each list in order (wrapping around) instead
+    of jumping around randomly.
     """
-    rng = random.Random(shuffle_seed)
+    def pick(options):
+        return options[shuffle_seed % len(options)] if options else ""
 
     def replace(match):
         body = match.group(1)
@@ -186,7 +189,7 @@ def resolve_template(text, shuffle_seed, templates, current_page=1):
 
         if "|" in body:
             options = [o.strip() for o in body.split("|") if o.strip()]
-            return rng.choice(options) if options else ""
+            return str(pick(options))
         key = body.strip().lower()
         options = templates.get(key)
         if options:
@@ -194,7 +197,7 @@ def resolve_template(text, shuffle_seed, templates, current_page=1):
             if not valid_options:  # Fallback to all texts if all disabled
                 valid_options = [o["text"] for o in options if isinstance(o, dict) and "text" in o]
             if valid_options:
-                return str(rng.choice(valid_options))
+                return str(pick(valid_options))
         return match.group(0)  # unknown aspect: leave untouched
 
     # Resolve repeatedly so template entries may themselves contain placeholders.
@@ -254,7 +257,7 @@ class PromptManager:
                 "shuffle_seed": ("INT", {
                     "default": 0, "min": 0, "max": 0xffffffffffffffff,
                     "control_after_generate": True,
-                    "tooltip": "Controls template placeholder picks. Set to 'randomize' to reshuffle aspects each run, 'fixed' to keep the current picks.",
+                    "tooltip": "Controls template placeholder picks: for each aspect, index = shuffle_seed % item count. Set to 'increment' to step through each list in a fixed order, 'randomize' to jump around, 'fixed' to keep the current picks.",
                 }),
                 "enhancer": ("STRING", {
                     "default": NONE_ENHANCER,

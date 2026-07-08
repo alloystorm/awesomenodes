@@ -138,6 +138,7 @@ async function showTemplateEditor() {
     }
 
     let activeCategory = Object.keys(templates)[0];
+    let dragSrcIndex = null;
 
     const overlay = document.createElement("div");
     Object.assign(overlay.style, {
@@ -155,6 +156,9 @@ async function showTemplateEditor() {
 
     const title = document.createElement("h3");
     title.innerText = "Edit Templates";
+    const subtitle = document.createElement("div");
+    subtitle.innerText = "Drag items (⠿) to reorder — order determines which item the shuffle seed picks.";
+    Object.assign(subtitle.style, { color: "#888", fontSize: "11px", margin: "-10px 0 12px 0" });
     title.style.margin = "0 0 15px 0";
 
     const workspace = document.createElement("div");
@@ -282,10 +286,42 @@ async function showTemplateEditor() {
         const items = templates[activeCategory];
         items.forEach((item, index) => {
             const itemRow = document.createElement("div");
+            itemRow.draggable = true;
             Object.assign(itemRow.style, {
                 display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "8px", backgroundColor: "#1a1a1a", borderRadius: "4px"
+                padding: "8px", backgroundColor: "#1a1a1a", borderRadius: "4px", cursor: "grab"
             });
+
+            itemRow.ondragstart = (e) => {
+                dragSrcIndex = index;
+                e.dataTransfer.effectAllowed = "move";
+                itemRow.style.opacity = "0.4";
+            };
+            itemRow.ondragend = () => {
+                dragSrcIndex = null;
+                itemRow.style.opacity = "1";
+            };
+            itemRow.ondragover = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                itemRow.style.borderTop = "2px solid #2196F3";
+            };
+            itemRow.ondragleave = () => {
+                itemRow.style.borderTop = "";
+            };
+            itemRow.ondrop = (e) => {
+                e.preventDefault();
+                itemRow.style.borderTop = "";
+                if (dragSrcIndex === null || dragSrcIndex === index) return;
+                const [moved] = items.splice(dragSrcIndex, 1);
+                items.splice(index, 0, moved);
+                dragSrcIndex = null;
+                render();
+            };
+
+            const dragHandle = document.createElement("span");
+            dragHandle.innerText = "⠿";
+            Object.assign(dragHandle.style, { color: "#666", cursor: "grab", padding: "0 2px" });
 
             const leftGroup = document.createElement("div");
             Object.assign(leftGroup.style, {
@@ -304,6 +340,7 @@ async function showTemplateEditor() {
             itemText.style.flex = "1";
             itemText.style.wordBreak = "break-all";
 
+            leftGroup.appendChild(dragHandle);
             leftGroup.appendChild(checkbox);
             leftGroup.appendChild(itemText);
 
@@ -370,6 +407,7 @@ async function showTemplateEditor() {
     btnRow.appendChild(saveBtn);
 
     dialog.appendChild(title);
+    dialog.appendChild(subtitle);
     dialog.appendChild(workspace);
     dialog.appendChild(btnRow);
     overlay.appendChild(dialog);

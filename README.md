@@ -23,8 +23,9 @@ The prompt may contain placeholders:
   folder). Add your own aspects by adding keys to that file; any `{key}`
   matching a key is resolved. Template entries may themselves contain
   placeholders (resolved up to 5 levels). Each entry can be disabled without
-  deleting it — use the node's right-click **Edit Templates** dialog to
-  toggle/add/remove entries per category.
+  deleting it, and dragged (via the ⠿ handle) to reorder — use the node's
+  right-click **Edit Templates** dialog to toggle/add/remove/reorder entries
+  per category.
 - `{option a|option b|option c}` — inline options, one is picked.
 - `{page}` — replaced with the current page counter (see **Pages** below).
 - Unknown placeholders are left untouched.
@@ -38,9 +39,13 @@ Example:
 ### Shuffling
 
 Picks are driven by the **`shuffle_seed`** widget, independent of any
-generation seed elsewhere in the workflow:
+generation seed elsewhere in the workflow. For each placeholder, the picked
+item's index is `shuffle_seed % item count` (counting only enabled items) —
+so item *order* controls the sequence (drag to reorder in the editor):
 
-- `shuffle_seed` → *randomize*: aspects reshuffle on every run.
+- `shuffle_seed` → *increment*: steps through each aspect's list in order,
+  wrapping around — a predictable, repeatable sequence across runs.
+- `shuffle_seed` → *randomize*: jumps to an arbitrary index each run.
 - `shuffle_seed` → *fixed*: the current picks are kept exactly.
 
 ### Pages
