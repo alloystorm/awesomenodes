@@ -328,6 +328,9 @@ class PromptManager:
         if not hasattr(self, "column_indices"):
             self.column_indices = {}
 
+        if not columns:
+            return {}
+
         if mode == "Freeze":
             for key, _ in columns:
                 self.column_indices.setdefault(key, 0)
@@ -340,12 +343,18 @@ class PromptManager:
             return {key: self.column_indices[key] for key, _ in columns}
 
         if mode == "Sequential Aligned":
-            # Bring every column up to the same shared index, then step
-            # that shared index together on later advances.
-            target = max((self.column_indices.get(key, -1) for key, _ in columns), default=-1) + 1
-            for key, count in columns:
-                self.column_indices[key] = target % count
-            return {key: self.column_indices[key] for key, _ in columns}
+            # A single shared step advances every column together, wrapping
+            # at the size of the largest column (not each column's own
+            # size), so columns re-sync to row 1 in lockstep once the
+            # largest column would wrap — e.g. counts 5/8/5 give a1-b1-c1,
+            # ... a1-b6-c1 at step 6, then back to a1-b1-c1 at step 9 —
+            # instead of drifting apart via independent per-column wraps.
+            max_count = max(count for _, count in columns)
+            self.aligned_counter = getattr(self, "aligned_counter", -1) + 1
+            step = self.aligned_counter % max_count
+            index_map = {key: step % count for key, count in columns}
+            self.column_indices.update(index_map)
+            return index_map
 
         if mode == "Iterate All":
             self.combo_counter = getattr(self, "combo_counter", -1) + 1
