@@ -371,6 +371,14 @@ class PromptManager:
         self.column_indices.update(index_map)
         return index_map
 
+    @classmethod
+    def IS_CHANGED(cls, prompt, pages, shuffle_mode, enhancer=NONE_ENHANCER, debug_print=False):
+        # Every mode but Freeze mutates state each run even when none of the
+        # widget values change, so this node can never be cached — always
+        # report changed to force re-execution (and thus another run()) on
+        # every queue.
+        return float("nan")
+
     def run(self, prompt, pages, shuffle_mode, enhancer=NONE_ENHANCER, debug_print=False):
         if not hasattr(self, "run_counter"):
             self.run_counter = 0
