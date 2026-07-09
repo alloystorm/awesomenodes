@@ -2,13 +2,14 @@
 
 Supplies a prompt to a workflow, keeps a local history of used prompts
 (selectable from a dropdown on the node), and supports template placeholders
-like {scene}, {environment}, {genre}, {character} whose picks are indexed by
-a dedicated shuffle seed (index = seed % item count), so incrementing the
-seed steps deterministically through each list in order.
+like {scene}, {environment}, {genre}, {character} whose picks advance between
+runs according to a selectable shuffle mode (Freeze, Sequential, Sequential
+Aligned, Iterate All, Random).
 """
 
 import json
 import os
+import random
 import re
 import threading
 import time
@@ -171,17 +172,51 @@ def load_enhancers():
     return enhancers
 
 
-def resolve_template(text, shuffle_seed, templates, current_page=1):
+def discover_columns(text, templates):
+    """Return an ordered list of (key, count) for each distinct placeholder in text.
+
+    Order matches first appearance in the raw prompt text. "Iterate All" uses
+    this order to treat the last-appearing placeholder as the fastest-changing
+    column, like the least-significant digit of an odometer.
+    """
+    columns = []
+    seen = set()
+    for match in PLACEHOLDER_RE.finditer(text):
+        body = match.group(1)
+        if body.strip().lower() == "page":
+            continue
+
+        if "|" in body:
+            options = [o.strip() for o in body.split("|") if o.strip()]
+            if not options:
+                continue
+            key = "inline:" + "|".join(options)
+            count = len(options)
+        else:
+            key = body.strip().lower()
+            options = templates.get(key)
+            if not options:
+                continue
+            valid_options = [o["text"] for o in options if isinstance(o, dict) and o.get("enabled", True)]
+            if not valid_options:  # Fallback to all texts if all disabled
+                valid_options = [o["text"] for o in options if isinstance(o, dict) and "text" in o]
+            count = len(valid_options)
+            if count == 0:
+                continue
+
+        if key not in seen:
+            seen.add(key)
+            columns.append((key, count))
+    return columns
+
+
+def resolve_template(text, index_map, templates, current_page=1):
     """Replace {aspect} and inline {a|b|c} placeholders.
 
-    Each placeholder picks item index = shuffle_seed % item_count: a fixed
-    seed always yields the same picks, and incrementing shuffle_seed steps
-    deterministically through each list in order (wrapping around) instead
-    of jumping around randomly.
+    index_map maps each placeholder's key (aspect name, or "inline:a|b|c" for
+    an inline pick list) to the index to use; it's resolved modulo the option
+    count so it always lands on a valid choice.
     """
-    def pick(options):
-        return options[shuffle_seed % len(options)] if options else ""
-
     def replace(match):
         body = match.group(1)
         if body.strip().lower() == "page":
@@ -189,7 +224,11 @@ def resolve_template(text, shuffle_seed, templates, current_page=1):
 
         if "|" in body:
             options = [o.strip() for o in body.split("|") if o.strip()]
-            return str(pick(options))
+            if not options:
+                return match.group(0)
+            key = "inline:" + "|".join(options)
+            return str(options[index_map.get(key, 0) % len(options)])
+
         key = body.strip().lower()
         options = templates.get(key)
         if options:
@@ -197,7 +236,7 @@ def resolve_template(text, shuffle_seed, templates, current_page=1):
             if not valid_options:  # Fallback to all texts if all disabled
                 valid_options = [o["text"] for o in options if isinstance(o, dict) and "text" in o]
             if valid_options:
-                return str(pick(valid_options))
+                return str(valid_options[index_map.get(key, 0) % len(valid_options)])
         return match.group(0)  # unknown aspect: leave untouched
 
     # Resolve repeatedly so template entries may themselves contain placeholders.
@@ -236,7 +275,7 @@ class PromptManager:
     DESCRIPTION = (
         "Supplies a prompt to a workflow. Keeps a local history "
         "selectable from the node, resolves {scene}/{environment}/{genre}/"
-        "{character}/{a|b|c} placeholders using the shuffle seed, and outputs "
+        "{character}/{a|b|c} placeholders using the selected shuffle mode, and outputs "
         "a selectable saved enhancer/system instruction for a text-generation node."
     )
 
@@ -254,10 +293,16 @@ class PromptManager:
                     "default": 1, "min": 1, "max": 10000,
                     "tooltip": "Keep the same templates for N runs. Use {page} in your prompt to print the current counter.",
                 }),
-                "shuffle_seed": ("INT", {
-                    "default": 0, "min": 0, "max": 0xffffffffffffffff,
-                    "control_after_generate": True,
-                    "tooltip": "Controls template placeholder picks: for each aspect, index = shuffle_seed % item count. Set to 'increment' to step through each list in a fixed order, 'randomize' to jump around, 'fixed' to keep the current picks.",
+                "shuffle_mode": (["Freeze", "Sequential", "Sequential Aligned", "Iterate All", "Random"], {
+                    "default": "Sequential",
+                    "tooltip": (
+                        "Controls how template placeholder picks advance between runs (once per `pages` group):\n"
+                        "Freeze: keep the current picks.\n"
+                        "Sequential: each column advances from its own current position, independently.\n"
+                        "Sequential Aligned: all columns advance together, using the same index.\n"
+                        "Iterate All: step through every combination (rightmost placeholder changes fastest).\n"
+                        "Random: pick a random index per column each group."
+                    ),
                 }),
                 "enhancer": ("STRING", {
                     "default": NONE_ENHANCER,
@@ -267,26 +312,77 @@ class PromptManager:
             }
         }
 
-    def run(self, prompt, pages, shuffle_seed, enhancer=NONE_ENHANCER, debug_print=False):
+    def advance_index_map(self, mode, columns):
+        """Compute the next per-column pick index for `mode`, persisted on self.
+
+        Called once per `pages` group (see run()), and only for the columns
+        found in the current prompt (see discover_columns()) — placeholders
+        not present in the prompt this run are left untouched and ignored.
+
+        self.column_indices is the single shared "current position" per
+        column: every mode reads it as its starting point and writes its
+        result back, so switching modes mid-workflow continues from wherever
+        the columns currently sit (e.g. Random landing on a2-b3-c1, then
+        switching to Sequential, advances to a3-b4-c2) rather than resetting.
+        """
+        if not hasattr(self, "column_indices"):
+            self.column_indices = {}
+
+        if mode == "Freeze":
+            for key, _ in columns:
+                self.column_indices.setdefault(key, 0)
+            return {key: self.column_indices[key] % count for key, count in columns}
+
+        if mode == "Sequential":
+            # Each column advances independently from its own current index.
+            for key, count in columns:
+                self.column_indices[key] = (self.column_indices.get(key, -1) + 1) % count
+            return {key: self.column_indices[key] for key, _ in columns}
+
+        if mode == "Sequential Aligned":
+            # Bring every column up to the same shared index, then step
+            # that shared index together on later advances.
+            target = max((self.column_indices.get(key, -1) for key, _ in columns), default=-1) + 1
+            for key, count in columns:
+                self.column_indices[key] = target % count
+            return {key: self.column_indices[key] for key, _ in columns}
+
+        if mode == "Iterate All":
+            self.combo_counter = getattr(self, "combo_counter", -1) + 1
+            index_map = {}
+            remaining = self.combo_counter
+            for key, count in reversed(columns):  # rightmost placeholder changes fastest
+                index_map[key] = remaining % count
+                remaining //= count
+            self.column_indices.update(index_map)
+            return index_map
+
+        # Random (and any unrecognized mode)
+        index_map = {key: random.randrange(count) for key, count in columns}
+        self.column_indices.update(index_map)
+        return index_map
+
+    def run(self, prompt, pages, shuffle_mode, enhancer=NONE_ENHANCER, debug_print=False):
         if not hasattr(self, "run_counter"):
             self.run_counter = 0
-            self.locked_seed = shuffle_seed
             self.target_pages = pages
+            self.locked_index_map = None
 
         if getattr(self, "target_pages", 1) != pages:
             self.run_counter = 0
             self.target_pages = pages
-            self.locked_seed = shuffle_seed
 
-        if self.run_counter >= self.target_pages:
+        templates = load_templates()
+
+        if self.locked_index_map is None or self.run_counter >= self.target_pages:
             self.run_counter = 0
-            self.locked_seed = shuffle_seed
+            columns = discover_columns(prompt, templates)
+            self.locked_index_map = self.advance_index_map(shuffle_mode, columns)
 
         self.run_counter += 1
         current_page = self.run_counter
 
-        templates = load_templates()
-        resolved = resolve_template(prompt, self.locked_seed, templates, current_page=current_page)
+        resolved = resolve_template(prompt, self.locked_index_map, templates, current_page=current_page)
 
         enhancers = load_enhancers()
         enhancer_instruction = enhancers.get(enhancer, "") if enhancer != NONE_ENHANCER else ""
@@ -299,7 +395,7 @@ class PromptManager:
         save_history_entry({
             "prompt": prompt,
             "resolved_prompt": resolved,
-            "shuffle_seed": shuffle_seed,
+            "shuffle_mode": shuffle_mode,
             "pages": pages,
             "enhancer": enhancer,
             "timestamp": time.time(),

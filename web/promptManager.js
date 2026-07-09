@@ -45,7 +45,7 @@ function applyEntry(node, entry) {
         }
     };
     set("prompt", entry.prompt);
-    set("shuffle_seed", entry.shuffle_seed);
+    set("shuffle_mode", entry.shuffle_mode);
     if (entry.pages !== undefined) set("pages", entry.pages);
     if (entry.enhancer !== undefined) set("enhancer", entry.enhancer);
     node.setDirtyCanvas(true, true);
@@ -164,7 +164,7 @@ async function showTemplateEditor() {
     title.innerText = "Edit Templates";
     title.style.margin = "0 0 4px 0";
     const subtitle = document.createElement("div");
-    subtitle.innerText = "Drag ⠿ to reorder within a column — the row number is the index the shuffle seed picks (index = seed % count).";
+    subtitle.innerText = "Drag ⠿ to reorder within a column — the row number is the index the shuffle mode picks from.";
     Object.assign(subtitle.style, { color: "#888", fontSize: "11px", margin: "0 0 12px 0" });
 
     const tableWrap = document.createElement("div");
