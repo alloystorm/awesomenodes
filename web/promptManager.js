@@ -145,6 +145,7 @@ async function showTemplateEditor() {
 
     const COL_WIDTH = 220;
     let dragSrc = null; // { category, index }
+    let dragCatSrc = null; // category name of the column being dragged
 
     const overlay = document.createElement("div");
     Object.assign(overlay.style, {
@@ -206,8 +207,47 @@ async function showTemplateEditor() {
                 width: COL_WIDTH + "px", minWidth: COL_WIDTH + "px", textAlign: "left",
             });
 
+            th.ondragover = (e) => {
+                if (!dragCatSrc || dragCatSrc === cat) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                th.style.boxShadow = "inset 2px 0 0 #2196F3";
+            };
+            th.ondragleave = () => { th.style.boxShadow = ""; };
+            th.ondrop = (e) => {
+                e.preventDefault();
+                th.style.boxShadow = "";
+                if (!dragCatSrc || dragCatSrc === cat) return;
+                const keys = Object.keys(templates);
+                const srcIdx = keys.indexOf(dragCatSrc);
+                const destIdx = keys.indexOf(cat);
+                if (srcIdx === -1 || destIdx === -1) return;
+                keys.splice(srcIdx, 1);
+                keys.splice(destIdx, 0, dragCatSrc);
+                const reordered = {};
+                for (const k of keys) reordered[k] = templates[k];
+                templates = reordered;
+                dragCatSrc = null;
+                render();
+            };
+
             const headInner = document.createElement("div");
             Object.assign(headInner.style, { display: "flex", alignItems: "center", gap: "6px" });
+
+            const dragCatHandle = document.createElement("span");
+            dragCatHandle.innerText = "⠿";
+            dragCatHandle.draggable = true;
+            dragCatHandle.title = "Drag to reorder column";
+            Object.assign(dragCatHandle.style, { color: "#666", cursor: "grab" });
+            dragCatHandle.ondragstart = (e) => {
+                dragCatSrc = cat;
+                e.dataTransfer.effectAllowed = "move";
+                headInner.style.opacity = "0.4";
+            };
+            dragCatHandle.ondragend = () => {
+                dragCatSrc = null;
+                headInner.style.opacity = "1";
+            };
 
             const nameSpan = document.createElement("span");
             nameSpan.innerText = cat;
@@ -225,6 +265,7 @@ async function showTemplateEditor() {
                 }
             };
 
+            headInner.appendChild(dragCatHandle);
             headInner.appendChild(nameSpan);
             headInner.appendChild(delCatBtn);
             th.appendChild(headInner);
@@ -257,9 +298,12 @@ async function showTemplateEditor() {
         table.appendChild(thead);
 
         // Body rows: one per index position, aligned across all category columns.
+        // Each column's "+ add item" input sits in the row right after its own
+        // last item (not a single shared row at the bottom), so short columns
+        // don't leave a gap of blank cells before you can add to them.
         const tbody = document.createElement("tbody");
 
-        for (let i = 0; i < maxLen; i++) {
+        for (let i = 0; i <= maxLen; i++) {
             const tr = document.createElement("tr");
 
             const rowNumTd = document.createElement("td");
@@ -338,6 +382,24 @@ async function showTemplateEditor() {
                     cellRow.appendChild(textInput);
                     cellRow.appendChild(delBtn);
                     td.appendChild(cellRow);
+                } else if (i === items.length) {
+                    const input = document.createElement("input");
+                    input.type = "text";
+                    input.placeholder = "+ add item";
+                    Object.assign(input.style, {
+                        width: "100%", padding: "3px 5px", backgroundColor: "#111", color: "#fff",
+                        border: "1px dashed #444", borderRadius: "3px", outline: "none", fontSize: "12px", boxSizing: "border-box",
+                    });
+                    input.onkeydown = (e) => {
+                        if (e.key === "Enter") {
+                            const val = input.value.trim();
+                            if (val) {
+                                items.push({ text: val, enabled: true });
+                                render();
+                            }
+                        }
+                    };
+                    td.appendChild(input);
                 }
 
                 tr.appendChild(td);
@@ -346,35 +408,6 @@ async function showTemplateEditor() {
             tr.appendChild(styleCell(document.createElement("td"), {}));
             tbody.appendChild(tr);
         }
-
-        // Trailing "add item" row, one input per category column.
-        const addTr = document.createElement("tr");
-        addTr.appendChild(styleCell(document.createElement("td"), { position: "sticky", left: "0", backgroundColor: "#1a1a1a" }));
-
-        for (const cat of categories) {
-            const td = document.createElement("td");
-            styleCell(td, {});
-            const input = document.createElement("input");
-            input.type = "text";
-            input.placeholder = "+ add item";
-            Object.assign(input.style, {
-                width: "100%", padding: "3px 5px", backgroundColor: "#111", color: "#fff",
-                border: "1px dashed #444", borderRadius: "3px", outline: "none", fontSize: "12px", boxSizing: "border-box",
-            });
-            input.onkeydown = (e) => {
-                if (e.key === "Enter") {
-                    const val = input.value.trim();
-                    if (val) {
-                        templates[cat].push({ text: val, enabled: true });
-                        render();
-                    }
-                }
-            };
-            td.appendChild(input);
-            addTr.appendChild(td);
-        }
-        addTr.appendChild(styleCell(document.createElement("td"), {}));
-        tbody.appendChild(addTr);
 
         table.appendChild(tbody);
     }
