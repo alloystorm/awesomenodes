@@ -285,7 +285,7 @@ class PromptManager:
             "required": {
                 "prompt": ("STRING", {
                     "multiline": True,
-                    "default": "",
+                    "default": "{character} in {scene} with {environment}, {genre}, {style}",
                     "dynamicPrompts": False,
                     "tooltip": "Positive prompt. Supports {character}, {scene}, {environment}, {genre}, {style}, {page}, and inline {a|b|c} placeholders.",
                 }),
