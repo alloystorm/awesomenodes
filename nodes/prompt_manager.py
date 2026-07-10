@@ -20,52 +20,23 @@ from server import PromptServer
 NODE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HISTORY_FILE = os.path.join(NODE_DIR, "history.json")
 TEMPLATES_FILE = os.path.join(NODE_DIR, "templates.json")
+DEFAULT_TEMPLATES_FILE = os.path.join(NODE_DIR, "default_templates.json")
 ENHANCERS_FILE = os.path.join(NODE_DIR, "enhancers.json")
 MAX_HISTORY = 200
 NONE_ENHANCER = "None"
 
 _lock = threading.Lock()
 
-DEFAULT_TEMPLATES = {
-    "character": [
-        "a weathered old sailor",
-        "a young inventor with brass goggles",
-        "an elegant sorceress in flowing robes",
-        "a stoic android detective",
-        "a cheerful street musician",
-        "a battle-worn knight",
-    ],
-    "scene": [
-        "a bustling marketplace",
-        "a quiet library",
-        "an abandoned factory",
-        "a rooftop at sunset",
-        "a misty harbor at dawn",
-        "a neon-lit alleyway",
-        "a grand ballroom",
-        "a mountain summit",
-    ],
-    "environment": [
-        "dense fog rolling in",
-        "golden hour lighting",
-        "heavy rain and wet reflections",
-        "snow falling gently",
-        "harsh midday sun",
-        "moody overcast sky",
-        "bioluminescent glow",
-    ],
-    "genre": [
-        "cyberpunk",
-        "dark fantasy",
-        "retro sci-fi",
-    ],
-    "style": [
-        "studio ghibli style",
-        "baroque oil painting",
-        "photorealistic",
-        "watercolor illustration",
-    ],
-}
+
+def _load_json(path, default):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return default
+
+
+DEFAULT_TEMPLATES = _load_json(DEFAULT_TEMPLATES_FILE, {})
 
 DEFAULT_ENHANCERS = {
     "Comic Page Art Director": (
@@ -124,14 +95,6 @@ DEFAULT_ENHANCERS = {
 }
 
 PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
-
-
-def _load_json(path, default):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return default
 
 
 def _save_json(path, data):
