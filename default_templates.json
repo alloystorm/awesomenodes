@@ -1,0 +1,349 @@
+{
+  "character": [
+    {
+      "text": "Wonder Woman",
+      "enabled": true
+    },
+    {
+      "text": "Harley Quinn",
+      "enabled": true
+    },
+    {
+      "text": "Catwoman",
+      "enabled": true
+    },
+    {
+      "text": "Black Widow",
+      "enabled": true
+    },
+    {
+      "text": "Storm",
+      "enabled": true
+    },
+    {
+      "text": "Jean Grey",
+      "enabled": true
+    },
+    {
+      "text": "Scarlet Witch",
+      "enabled": true
+    },
+    {
+      "text": "Supergirl",
+      "enabled": true
+    },
+    {
+      "text": "Batgirl",
+      "enabled": true
+    },
+    {
+      "text": "Spider-Woman",
+      "enabled": true
+    },
+    {
+      "text": "Gamora",
+      "enabled": true
+    },
+    {
+      "text": "Rogue",
+      "enabled": true
+    },
+    {
+      "text": "Poison Ivy",
+      "enabled": true
+    },
+    {
+      "text": "Emma Frost",
+      "enabled": true
+    },
+    {
+      "text": "Psylocke",
+      "enabled": true
+    },
+    {
+      "text": "Captain Marvel",
+      "enabled": true
+    },
+    {
+      "text": "Valkyrie",
+      "enabled": true
+    },
+    {
+      "text": "Invisible Woman",
+      "enabled": true
+    },
+    {
+      "text": "Mystique",
+      "enabled": true
+    },
+    {
+      "text": "Jubilee",
+      "enabled": true
+    },
+    {
+      "text": "Sailor Moon",
+      "enabled": true
+    },
+    {
+      "text": "Sakura Haruno",
+      "enabled": true
+    },
+    {
+      "text": "Asuka Langley Soryu",
+      "enabled": true
+    },
+    {
+      "text": "Mikasa Ackerman",
+      "enabled": true
+    },
+    {
+      "text": "Zero Two",
+      "enabled": true
+    },
+    {
+      "text": "Makima",
+      "enabled": true
+    },
+    {
+      "text": "Saber",
+      "enabled": true
+    },
+    {
+      "text": "Rei Ayanami",
+      "enabled": true
+    },
+    {
+      "text": "Rukia Kuchiki",
+      "enabled": true
+    },
+    {
+      "text": "Bulma",
+      "enabled": true
+    },
+    {
+      "text": "Hinata Hyuga",
+      "enabled": true
+    },
+    {
+      "text": "Yoruichi Shihouin",
+      "enabled": true
+    },
+    {
+      "text": "Lucy Heartfilia",
+      "enabled": true
+    },
+    {
+      "text": "Erza Scarlet",
+      "enabled": true
+    },
+    {
+      "text": "Nami",
+      "enabled": true
+    },
+    {
+      "text": "Nezuko Kamado",
+      "enabled": true
+    },
+    {
+      "text": "Violet Evergarden",
+      "enabled": true
+    },
+    {
+      "text": "Boa Hancock",
+      "enabled": true
+    },
+    {
+      "text": "San",
+      "enabled": true
+    },
+    {
+      "text": "Rem",
+      "enabled": true
+    },
+    {
+      "text": "Princess Zelda",
+      "enabled": true
+    },
+    {
+      "text": "Samus Aran",
+      "enabled": true
+    },
+    {
+      "text": "Lara Croft",
+      "enabled": true
+    },
+    {
+      "text": "Jill Valentine",
+      "enabled": true
+    },
+    {
+      "text": "Tifa Lockhart",
+      "enabled": true
+    },
+    {
+      "text": "Ada Wong",
+      "enabled": true
+    },
+    {
+      "text": "Aloy",
+      "enabled": true
+    },
+    {
+      "text": "Bayonetta",
+      "enabled": true
+    },
+    {
+      "text": "Chun-Li",
+      "enabled": true
+    },
+    {
+      "text": "Aerith Gainsborough",
+      "enabled": true
+    }
+  ],
+  "genre": [
+
+    {
+      "text": "cyberpunk",
+      "enabled": true
+    },
+    {
+      "text": "dark fantasy",
+      "enabled": true
+    },
+    {
+      "text": "retro sci-fi",
+      "enabled": true
+    }
+  ],
+  "environment": [
+    {
+      "text": "dense fog rolling in",
+      "enabled": true
+    },
+    {
+      "text": "golden hour lighting",
+      "enabled": true
+    },
+    {
+      "text": "snow falling gently",
+      "enabled": true
+    },
+    {
+      "text": "heavy rain and wet reflections",
+      "enabled": true
+    },
+    {
+      "text": "harsh midday sun",
+      "enabled": true
+    },
+    {
+      "text": "moody overcast sky",
+      "enabled": true
+    },
+    {
+      "text": "bioluminescent glow",
+      "enabled": true
+    }
+  ],
+  "scene": [
+    {
+      "text": "a busy coffee shop with wooden tables, chairs, and a gleaming coffee machine",
+      "enabled": true
+    },
+    {
+      "text": "a rainy subway platform with benches, ticket machines, and flickering lights",
+      "enabled": true
+    },
+    {
+      "text": "a cozy bookstore with shelves, reading lamps, and a brass bell",
+      "enabled": true
+    },
+    {
+      "text": "a neon-lit alleyway with graffiti, trash bins, and flickering signs",
+      "enabled": true
+    },
+    {
+      "text": "a crowded train carriage with overhead straps, windows, and luggage racks",
+      "enabled": true
+    },
+    {
+      "text": "a sunlit rooftop garden with potted plants, patio chairs, and hanging lights",
+      "enabled": true
+    },
+    {
+      "text": "a quiet library with study desks, bookshelves, and a globe",
+      "enabled": true
+    },
+    {
+      "text": "a seaside boardwalk with benches, street lamps, and snack carts",
+      "enabled": true
+    },
+    {
+      "text": "a modern kitchen with cabinets, a dining table, and a kettle",
+      "enabled": true
+    },
+    {
+      "text": "a dimly lit bar with stools, neon bottles, and a jukebox",
+      "enabled": true
+    },
+    {
+      "text": "a bustling street market with stalls, banners, and wooden crates",
+      "enabled": true
+    },
+    {
+      "text": "a lively university courtyard with benches, vending machines, and bicycles",
+      "enabled": true
+    },
+    {
+      "text": "a stylish hotel lobby with sofas, potted plants, and a reception desk",
+      "enabled": true
+    },
+    {
+      "text": "a moonlit rooftop with antennas, cables, and a weathered chair",
+      "enabled": true
+    },
+    {
+      "text": "a hospital waiting room with magazines, chairs, and a vending machine",
+      "enabled": true
+    },
+    {
+      "text": "a snowy mountain lodge with fireplaces, blankets, and wooden beams",
+      "enabled": true
+    },
+    {
+      "text": "a vintage arcade with cabinets, neon lights, and a ticket counter",
+      "enabled": true
+    },
+    {
+      "text": "a crowded beach at sunset with umbrellas, towels, and a cooler",
+      "enabled": true
+    },
+    {
+      "text": "a futuristic laboratory with monitors, glass tubes, and rolling stools",
+      "enabled": true
+    },
+    {
+      "text": "a bustling night market with lanterns, food stalls, and folding tables",
+      "enabled": true
+    }
+  ],
+  "style": [
+    {
+      "text": "studio ghibli style",
+      "enabled": true
+    },
+    {
+      "text": "baroque oil painting",
+      "enabled": true
+    },
+    {
+      "text": "photorealistic",
+      "enabled": true
+    },
+    {
+      "text": "watercolor illustration",
+      "enabled": true
+    }
+  ]
+}
