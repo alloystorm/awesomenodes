@@ -87,12 +87,24 @@ class RandomKeywordAppender:
             if clip is not None:
                 pool = extract_clip_vocab(clip)
             else:
-                print("[Random Keyword Enhancer] Warning: category is 'clip_vocab' but no CLIP model was provided. Returning empty pool.")
+                try:
+                    clip_vocab_path = os.path.join(NODE_DIR, "clip_vocab.json")
+                    with open(clip_vocab_path, "r", encoding="utf-8") as f:
+                        pool = json.load(f)
+                except Exception:
+                    print("[Random Keyword Enhancer] Warning: category is 'clip_vocab' but no CLIP model was provided, and clip_vocab.json not found.")
         elif category == "all":
             for klist in keywords_data.values():
                 pool.extend(klist)
             if clip is not None:
                 pool.extend(extract_clip_vocab(clip))
+            else:
+                try:
+                    clip_vocab_path = os.path.join(NODE_DIR, "clip_vocab.json")
+                    with open(clip_vocab_path, "r", encoding="utf-8") as f:
+                        pool.extend(json.load(f))
+                except Exception:
+                    pass
         else:
             pool = keywords_data.get(category, [])
             
