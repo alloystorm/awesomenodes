@@ -32,6 +32,24 @@ def load_keywords():
 
 import torch
 import torch.nn.functional as F
+import nltk
+
+def get_pos_category(pos_tag):
+    if pos_tag.startswith('NN'): return 'noun'
+    elif pos_tag.startswith('VB'): return 'verb'
+    elif pos_tag.startswith('JJ'): return 'adjective'
+    elif pos_tag.startswith('RB'): return 'adverb'
+    return 'other'
+
+def lazy_load_nltk():
+    try:
+        nltk.data.find('taggers/averaged_perceptron_tagger')
+    except LookupError:
+        nltk.download('averaged_perceptron_tagger', quiet=True)
+    try:
+        nltk.data.find('taggers/averaged_perceptron_tagger_eng')
+    except LookupError:
+        nltk.download('averaged_perceptron_tagger_eng', quiet=True)
 
 def extract_clip_vocab_and_embeddings(clip):
     vocab = None
@@ -63,12 +81,15 @@ def extract_clip_vocab_and_embeddings(clip):
 
     return vocab, embeds, tokenizer_obj
 
-def get_semantic_clip_vocab(clip, prompt, top_k=100):
+def get_semantic_clip_vocab(clip, prompt, top_k=100, pos_filter="any", semantic_search=True, threshold=-1.0):
     vocab, token_embeds, tokenizer_obj = extract_clip_vocab_and_embeddings(clip)
     
     # Fast path if we can't do semantic search: just return all clean words
     if not vocab or not isinstance(vocab, dict):
         return []
+        
+    if pos_filter != "any":
+        lazy_load_nltk()
         
     def clean_word(w):
         if isinstance(w, bytes):
@@ -82,7 +103,7 @@ def get_semantic_clip_vocab(clip, prompt, top_k=100):
             return w
         return None
 
-    if token_embeds is None or tokenizer_obj is None or not prompt.strip():
+    if token_embeds is None or tokenizer_obj is None or not prompt.strip() or not semantic_search:
         # Fallback: return all valid words
         words = []
         for word in vocab.keys():
@@ -127,7 +148,7 @@ def get_semantic_clip_vocab(clip, prompt, top_k=100):
         similarity = F.cosine_similarity(prompt_avg, token_embeds, dim=1)
         
         # We need a large enough top_k to account for subwords and invalid tokens being filtered out
-        search_k = min(top_k * 5, token_embeds.shape[0])
+        search_k = min(top_k * 10, token_embeds.shape[0])
         top_indices = torch.topk(similarity, search_k).indices.tolist()
         
         id_to_token = {v: k for k, v in vocab.items()}
@@ -135,10 +156,19 @@ def get_semantic_clip_vocab(clip, prompt, top_k=100):
         results = []
         seen = set()
         for idx in top_indices:
+            sim = similarity[idx].item()
+            if sim < threshold:
+                break # Since they are sorted, we can stop early
+                
             token = id_to_token.get(idx)
             if token:
                 cw = clean_word(token)
                 if cw and cw not in seen:
+                    if pos_filter != "any":
+                        pos_tag = nltk.pos_tag([cw])[0][1]
+                        category = get_pos_category(pos_tag)
+                        if category != pos_filter:
+                            continue
                     seen.add(cw)
                     results.append(cw)
                     if len(results) >= top_k:
@@ -165,7 +195,10 @@ class RandomKeywordAppender:
                 "prompt": ("STRING", {"forceInput": True}),
                 "category": (categories, {"default": "clip_vocab"}),
                 "num_keywords": ("INT", {"default": 3, "min": 1, "max": 20}),
+                "semantic_search": ("BOOLEAN", {"default": True, "label_on": "enabled", "label_off": "disabled", "tooltip": "If enabled, finds words semantically related to the prompt. If disabled, picks purely random words from the vocabulary."}),
+                "similarity_threshold": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.05, "tooltip": "Minimum cosine similarity score. If greater than -1.0, only words with at least this similarity will be included."}),
                 "top_k_pool": ("INT", {"default": 100, "min": 10, "max": 1000, "step": 10, "tooltip": "When using clip_vocab, samples from the closest K semantically related words."}),
+                "pos_filter": (["any", "noun", "verb", "adjective", "adverb"], {"default": "any", "tooltip": "Filter the sampled words by part of speech using NLTK."}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
             },
             "optional": {
@@ -173,13 +206,13 @@ class RandomKeywordAppender:
             }
         }
     
-    def run(self, prompt, category, num_keywords, top_k_pool, seed, clip=None):
+    def run(self, prompt, category, num_keywords, semantic_search, similarity_threshold, top_k_pool, pos_filter, seed, clip=None):
         keywords_data = load_keywords()
         
         pool = []
         if category == "clip_vocab":
             if clip is not None:
-                pool = get_semantic_clip_vocab(clip, prompt, top_k=top_k_pool)
+                pool = get_semantic_clip_vocab(clip, prompt, top_k=top_k_pool, pos_filter=pos_filter, semantic_search=semantic_search, threshold=similarity_threshold)
             else:
                 try:
                     clip_vocab_path = os.path.join(NODE_DIR, "clip_vocab.json")
@@ -191,7 +224,7 @@ class RandomKeywordAppender:
             for klist in keywords_data.values():
                 pool.extend(klist)
             if clip is not None:
-                pool.extend(get_semantic_clip_vocab(clip, prompt, top_k=500)) # Larger pool for 'all'
+                pool.extend(get_semantic_clip_vocab(clip, prompt, top_k=500, pos_filter=pos_filter, semantic_search=semantic_search, threshold=similarity_threshold)) # Larger pool for 'all'
             else:
                 try:
                     clip_vocab_path = os.path.join(NODE_DIR, "clip_vocab.json")
@@ -201,6 +234,15 @@ class RandomKeywordAppender:
                     pass
         else:
             pool = keywords_data.get(category, [])
+            
+        if pos_filter != "any" and category != "clip_vocab":
+            lazy_load_nltk()
+            filtered_pool = []
+            for w in pool:
+                ptag = nltk.pos_tag([w])[0][1]
+                if get_pos_category(ptag) == pos_filter:
+                    filtered_pool.append(w)
+            pool = filtered_pool
             
         if not pool:
             return (prompt,)
